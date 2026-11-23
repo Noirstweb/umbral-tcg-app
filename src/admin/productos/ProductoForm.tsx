@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase, mensajeError } from '../../lib/supabase'
 import type { Tables, TablesInsert } from '../../lib/database.types'
-import { slugify, sugerirSku, ETIQUETA_TIPO, ESTADOS_CARTA, ACABADOS, IDIOMAS, formatoFecha } from '../../lib/format'
+import { slugify, skuAutomatico, ETIQUETA_TIPO, ESTADOS_CARTA, ACABADOS, IDIOMAS, formatoFecha } from '../../lib/format'
 import { useAuth } from '../../auth/AuthProvider'
 import Fotos from './Fotos'
 
@@ -112,9 +112,7 @@ export default function ProductoForm() {
   }
 
   function skuSugerido(v: VarEdit) {
-    const idiomaCorto = { Español: 'ES', Inglés: 'EN', Japonés: 'JP', Portugués: 'PT', 'Sin idioma': '' }[v.idioma] ?? v.idioma.slice(0, 2)
-    const base = esSingle ? [setCodigo, numero.split('/')[0]] : [setCodigo || nombre.split(' ').slice(0, 2).join(' ')]
-    return sugerirSku([...base, idiomaCorto, esSingle ? v.estado_carta : '', v.acabado !== 'normal' ? (v.acabado === 'foil' ? 'F' : 'RH') : ''])
+    return skuAutomatico({ tipo, nombre, numero, juego: juegoId, set: setCodigo, idioma: v.idioma, estado: esSingle ? v.estado_carta : '', acabado: v.acabado })
   }
 
   function quitarVar(v: VarEdit) {
@@ -135,9 +133,11 @@ export default function ProductoForm() {
     variantes.forEach((v, i) => {
       const n = `Variante ${i + 1}`
       const sku = v.sku.trim().toUpperCase()
-      if (!/^[A-Z0-9][A-Z0-9_-]*$/.test(sku)) errs.push(`${n}: SKU vacío o con caracteres inválidos.`)
-      if (skus.has(sku)) errs.push(`${n}: SKU repetido.`)
-      skus.add(sku)
+      if (sku) {
+        if (!/^[A-Z0-9][A-Z0-9_-]*$/.test(sku)) errs.push(`${n}: el SKU solo puede tener letras, números, - y _ (o déjalo vacío y se genera solo).`)
+        if (skus.has(sku)) errs.push(`${n}: SKU repetido.`)
+        skus.add(sku)
+      }
       const combo = `${v.idioma}|${esSingle ? v.estado_carta : ''}|${v.acabado}`
       if (combos.has(combo)) errs.push(`${n}: ya hay otra variante con el mismo idioma${esSingle ? ', estado' : ''} y acabado.`)
       combos.add(combo)
@@ -191,10 +191,11 @@ export default function ProductoForm() {
           const cambio = (Object.keys(fila) as (keyof typeof fila)[]).some((k) => fila[k] !== o[k])
           if (!cambio) continue
           const { error } = await supabase.from('producto_variantes').update(fila).eq('id', v.id)
-          if (error) throw new Error(`${fila.sku}: ${mensajeError(error)}`)
+          if (error) throw new Error(`${fila.sku || 'Variante'}: ${mensajeError(error)}`)
         } else {
+          // SKU vacío: lo genera la base (trigger variantes_a_sku)
           const { error } = await supabase.from('producto_variantes').insert({ ...fila, producto_id: productoId })
-          if (error) throw new Error(`${fila.sku}: ${mensajeError(error)}`)
+          if (error) throw new Error(`${fila.sku || `Variante ${v.idioma}`}: ${mensajeError(error)}`)
         }
       }
 
@@ -284,15 +285,15 @@ export default function ProductoForm() {
           <button type="button" className="btn" onClick={() => setVariantes((vs) => [...vs, nuevaVariante()])}>+ Agregar variante</button>
         </div>
         <p className="muted chico">
-          Cada variante es una versión que se vende por separado, con su propio SKU, precio y stock
+          Cada variante es una versión que se vende por separado, con su propio precio y stock
           {esSingle ? ' (por ejemplo, Español NM, Español LP e Inglés NM foil).' : ' (por ejemplo, la versión en español y en inglés).'}
-          {' '}Los cambios de stock quedan registrados con tu usuario.
+          {' '}El SKU se genera solo si lo dejas vacío (verás el código sugerido en gris). Los cambios de stock quedan registrados con tu usuario.
         </p>
         <div className="tabla-scroll">
           <table className="tabla variantes">
             <thead>
               <tr>
-                <th>SKU *</th><th>Idioma</th>{esSingle && <th>Estado *</th>}<th>Acabado</th>
+                <th>SKU</th><th>Idioma</th>{esSingle && <th>Estado *</th>}<th>Acabado</th>
                 <th>Precio *</th><th>Oferta</th><th>Stock *</th><th>Mín.</th><th>Máx./pedido</th><th>Visible</th><th></th>
               </tr>
             </thead>
@@ -300,8 +301,9 @@ export default function ProductoForm() {
               {variantes.map((v) => (
                 <tr key={v.key}>
                   <td>
-                    <input className="in-sku" value={v.sku} onChange={(e) => cambiarVar(v.key, 'sku', e.target.value.toUpperCase())} aria-label="SKU" />
-                    {!v.sku && <button type="button" className="btn-link chico" onClick={() => cambiarVar(v.key, 'sku', skuSugerido(v))}>Sugerir</button>}
+                    <input className="in-sku" value={v.sku} placeholder={skuSugerido(v)} title={v.sku ? undefined : 'Se genera automáticamente al guardar'}
+                      onChange={(e) => cambiarVar(v.key, 'sku', e.target.value.toUpperCase())} aria-label="SKU (vacío = automático)" />
+                    {!v.sku && <div className="chico muted">automático</div>}
                   </td>
                   <td>
                     <select value={v.idioma} onChange={(e) => cambiarVar(v.key, 'idioma', e.target.value)} aria-label="Idioma">

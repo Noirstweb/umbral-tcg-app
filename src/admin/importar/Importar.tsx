@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase, mensajeError } from '../../lib/supabase'
 import type { Tables } from '../../lib/database.types'
 import { formatoCLP, formatoFecha } from '../../lib/format'
-import { leerArchivo, descargarPlantilla, type FilaImport } from './excel'
+import { leerArchivo, descargarPlantilla, exportarInventario, type FilaImport } from './excel'
 
 type Modo = 'ambos' | 'crear' | 'actualizar'
 type Detalle = {
-  fila: number; sku: string | null; accion: 'crear' | 'actualizar' | 'sin_cambios' | 'error'; errores?: string[]
+  fila: number; sku: string | null; nombre?: string | null; sku_generado?: boolean; producto_nuevo?: boolean; accion: 'crear' | 'actualizar' | 'sin_cambios' | 'error'; errores?: string[]
   stock_antes?: number | null; stock_nuevo?: number | null; precio_antes?: number | null; precio_nuevo?: number | null
   oferta_antes?: number | null; oferta_nueva?: number | null
 }
@@ -16,7 +16,7 @@ type Carga = Tables<'cargas_excel'> & { staff: { nombre: string } | null }
 const MODOS: Record<Modo, string> = {
   ambos: 'Crear nuevos y actualizar existentes',
   crear: 'Solo crear productos nuevos',
-  actualizar: 'Solo actualizar precio y stock de SKU existentes',
+  actualizar: 'Solo actualizar lo que ya existe (no crea nada)',
 }
 const ETIQUETA_ACCION: Record<Detalle['accion'], string> = { crear: 'Crear', actualizar: 'Actualizar', sin_cambios: 'Sin cambios', error: 'Error' }
 
@@ -94,6 +94,12 @@ export default function Importar() {
     setOcupado(null)
   }
 
+  async function exportar() {
+    setOcupado('Preparando tu inventario…'); setError(null)
+    try { await exportarInventario() } catch (e) { setError(mensajeError(e)) }
+    setOcupado(null)
+  }
+
   const res = final ?? vista
   const detalle = (res?.detalle ?? []).filter((d) =>
     filtro === 'todas' ? true : filtro === 'error' ? d.accion === 'error' : d.accion === 'crear' || d.accion === 'actualizar')
@@ -102,13 +108,17 @@ export default function Importar() {
     <>
       <header className="cabecera">
         <h1>Carga de stock por Excel</h1>
-        <button className="btn" onClick={plantilla} disabled={!!ocupado}>Descargar plantilla</button>
+        <div className="fila-botones">
+          <button className="btn" onClick={exportar} disabled={!!ocupado} title="Descarga todos tus productos en Excel para editarlos y volver a subirlos">Exportar inventario</button>
+          <button className="btn" onClick={plantilla} disabled={!!ocupado}>Descargar plantilla</button>
+        </div>
       </header>
 
       <section className="card">
         <ol className="pasos">
-          <li>Descarga la plantilla y completa una fila por variante (o exporta tu inventario con las mismas columnas).</li>
-          <li>Elige qué quieres hacer y sube el archivo (.xlsx o .csv).</li>
+          <li><strong>Para actualizar precios o stock:</strong> usa "Exportar inventario", cambia lo que necesites en ese archivo y súbelo.</li>
+          <li><strong>Para cargar productos nuevos:</strong> descarga la plantilla y escribe una fila por variante. No necesitas SKU: se generan solos.</li>
+          <li>Sube el archivo (.xlsx o .csv). El panel reconoce cada carta por nombre, set, número, idioma, estado y acabado.</li>
           <li>Revisa la vista previa: <strong>nada se guarda hasta que confirmes</strong>.</li>
         </ol>
         <div className="grilla">
@@ -153,12 +163,13 @@ export default function Importar() {
           </div>
           <div className="tabla-scroll">
             <table className="tabla">
-              <thead><tr><th>Fila</th><th>SKU</th><th>Acción</th><th>Detalle</th></tr></thead>
+              <thead><tr><th>Fila</th><th>Producto</th><th>SKU</th><th>Acción</th><th>Detalle</th></tr></thead>
               <tbody>
                 {detalle.map((d) => (
                   <tr key={d.fila} className={d.accion === 'error' ? 'fila-error' : ''}>
                     <td>{d.fila}</td>
-                    <td className="mono">{d.sku ?? '—'}</td>
+                    <td>{d.nombre ?? '—'}{d.producto_nuevo && <div className="chico aviso">Producto nuevo</div>}</td>
+                    <td className="mono">{d.sku ?? '—'}{d.sku_generado && <div className="chico muted">generado</div>}</td>
                     <td><span className={`pill a-${d.accion}`}>{ETIQUETA_ACCION[d.accion]}</span></td>
                     <td>
                       {d.accion === 'error' && <ul className="lista-errores">{d.errores?.map((e) => <li key={e}>{e}</li>)}</ul>}
@@ -175,7 +186,7 @@ export default function Importar() {
                     </td>
                   </tr>
                 ))}
-                {detalle.length === 0 && <tr><td colSpan={4} className="muted centro">Nada que mostrar con este filtro.</td></tr>}
+                {detalle.length === 0 && <tr><td colSpan={5} className="muted centro">Nada que mostrar con este filtro.</td></tr>}
               </tbody>
             </table>
           </div>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase, mensajeError, urlFoto } from '../../lib/supabase'
 import type { Tables } from '../../lib/database.types'
 import { formatoCLP, ETIQUETA_TIPO } from '../../lib/format'
+import { exportarInventario } from '../importar/excel'
 
 const POR_PAGINA = 50
 
@@ -24,6 +25,13 @@ export default function ProductosList() {
   const [soloSinStock, setSoloSinStock] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [exportando, setExportando] = useState(false)
+
+  async function exportar() {
+    setExportando(true); setError(null)
+    try { await exportarInventario() } catch (e) { setError(mensajeError(e)) }
+    setExportando(false)
+  }
 
   useEffect(() => {
     supabase.from('juegos').select('*').order('orden').then(({ data }) => setJuegos(data ?? []))
@@ -83,6 +91,7 @@ export default function ProductosList() {
       <header className="cabecera">
         <h1>Productos</h1>
         <div className="fila-botones">
+          <button className="btn" onClick={exportar} disabled={exportando}>{exportando ? 'Exportando…' : 'Exportar inventario'}</button>
           <Link className="btn" to="/admin/importar">Carga por Excel</Link>
           <Link className="btn primario" to="/admin/productos/nuevo">Nuevo producto</Link>
         </div>

@@ -129,6 +129,9 @@ label.check { flex-direction: row; align-items: center; gap: .5rem; font-weight:
 .pasos { margin: 0 0 1rem; padding-left: 1.2rem; color: var(--muted); }
 .paginacion { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
 
+.nuevo-set { background: var(--marca-suave); border-color: #ddd6fe; display: flex; flex-direction: column; gap: .5rem; margin: 0; }
+.nuevo-set input { flex: 1 1 180px; }
+
 /* Galería de fotos */
 .galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: .9rem; }
 .galeria figure { margin: 0; border: 1px solid var(--borde); border-radius: var(--radio); overflow: hidden; background: #fafafa; }

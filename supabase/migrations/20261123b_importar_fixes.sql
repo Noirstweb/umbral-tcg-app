@@ -15,3 +15,19 @@ $$;
 create or replace function privado.norm_numero(t text) returns text language sql immutable set search_path to '' as $$
   select ltrim(regexp_replace(upper(regexp_replace(split_part(coalesce(t, ''), '/', 1), '^.*-', '')), '[^A-Z0-9]', '', 'g'), '0')
 $$;
+
+-- 5) Sets nuevos desde el Excel: columna set_nombre. Si set_codigo no existe y viene set_nombre + juego,
+--    la importación crea el set (la vista previa lo marca con "Crea el set X").
+-- 6) Formato de códigos (migración sets_juegos_formato):
+create or replace function privado.normalizar_set() returns trigger language plpgsql set search_path to '' as $$
+begin
+  new.codigo := nullif(upper(trim(new.codigo)), '');
+  new.nombre := trim(new.nombre);
+  return new;
+end $$;
+drop trigger if exists sets_normalizar on public.sets;
+create trigger sets_normalizar before insert or update on public.sets for each row execute function privado.normalizar_set();
+alter table public.sets add constraint sets_codigo_formato check (codigo is null or codigo ~ '^[A-Z0-9][A-Z0-9_-]{0,19}$');
+alter table public.sets add constraint sets_nombre_largo check (length(nombre) between 2 and 120);
+alter table public.juegos add constraint juegos_id_formato check (id ~ '^[a-z0-9]{2,30}$');
+alter table public.juegos add constraint juegos_nombre_largo check (length(trim(nombre)) between 2 and 60);

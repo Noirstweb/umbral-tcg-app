@@ -10,6 +10,7 @@ export default function AdminLayout() {
         <nav>
           <NavLink to="/admin" end>Inicio</NavLink>
           <NavLink to="/admin/productos">Productos</NavLink>
+          <NavLink to="/admin/sets">Juegos y sets</NavLink>
           <NavLink to="/admin/importar">Carga por Excel</NavLink>
           <span className="nav-pronto" title="Etapa 3">Pedidos</span>
           {esDueno && <span className="nav-pronto" title="Etapa 3">Clientes (CRM)</span>}

@@ -69,6 +69,24 @@ export default function ProductoForm() {
   const [destacado, setDestacado] = useState(false)
   const [variantes, setVariantes] = useState<VarEdit[]>([nuevaVariante()])
   const [eliminadas, setEliminadas] = useState<VarEdit[]>([])
+  const [nuevoSet, setNuevoSet] = useState<{ nombre: string; codigo: string } | null>(null)
+  const [creandoSet, setCreandoSet] = useState(false)
+
+  async function crearSet() {
+    if (!nuevoSet) return
+    const nombreSet = nuevoSet.nombre.trim(), codigo = nuevoSet.codigo.trim().toUpperCase()
+    if (!juegoId) return setError('Elige primero el juego.')
+    if (nombreSet.length < 2) return setError('Escribe el nombre del set nuevo.')
+    if (!/^[A-Z0-9][A-Z0-9_-]{0,19}$/.test(codigo)) return setError('El código del set solo puede tener letras, números, - y _ (ej. SV10).')
+    setCreandoSet(true); setError(null)
+    const { data, error } = await supabase.from('sets').insert({ juego_id: juegoId, nombre: nombreSet, codigo }).select('*').single()
+    setCreandoSet(false)
+    if (error) return setError(mensajeError(error))
+    setSets((ss) => [data, ...ss])
+    setSetId(data.id)
+    setNuevoSet(null)
+    setOk(`Set ${codigo} creado y asignado a este producto.`)
+  }
 
   useEffect(() => {
     supabase.from('juegos').select('*').order('orden').then(({ data }) => {
@@ -261,11 +279,26 @@ export default function ProductoForm() {
             </select>
           </label>
           <label>Set / expansión
-            <select value={setId} onChange={(e) => setSetId(e.target.value)}>
+            <select value={nuevoSet ? '__nuevo__' : setId} onChange={(e) => {
+              if (e.target.value === '__nuevo__') return setNuevoSet({ nombre: '', codigo: '' })
+              setNuevoSet(null); setSetId(e.target.value)
+            }}>
               <option value="">Sin set</option>
               {sets.map((s) => <option key={s.id} value={s.id}>{s.nombre}{s.codigo ? ` (${s.codigo})` : ''}</option>)}
+              <option value="__nuevo__">＋ Crear set nuevo…</option>
             </select>
           </label>
+          {nuevoSet && (
+            <div className="ancho-total card nuevo-set">
+              <strong>Nuevo set de {juegos.find((j) => j.id === juegoId)?.nombre ?? 'este juego'}</strong>
+              <div className="fila-botones">
+                <input value={nuevoSet.nombre} onChange={(e) => setNuevoSet({ ...nuevoSet, nombre: e.target.value })} placeholder="Nombre (ej. Rivales Predestinados)" aria-label="Nombre del set nuevo" autoFocus />
+                <input className="mono" value={nuevoSet.codigo} maxLength={20} onChange={(e) => setNuevoSet({ ...nuevoSet, codigo: e.target.value.toUpperCase() })} placeholder="Código (ej. SV10)" aria-label="Código del set nuevo" />
+                <button type="button" className="btn primario" onClick={crearSet} disabled={creandoSet}>{creandoSet ? 'Creando…' : 'Crear set'}</button>
+                <button type="button" className="btn" onClick={() => setNuevoSet(null)}>Cancelar</button>
+              </div>
+            </div>
+          )}
           {esSingle && <label>Número de carta<input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="001/198" /></label>}
           {esSingle && <label>Rareza<input value={rareza} onChange={(e) => setRareza(e.target.value)} placeholder="Ultra Rara" /></label>}
           {tipo === 'preventa' && <label>Fecha de lanzamiento<input type="date" value={fechaLanz} onChange={(e) => setFechaLanz(e.target.value)} /></label>}

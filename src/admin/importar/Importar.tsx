@@ -6,7 +6,7 @@ import { leerArchivo, descargarPlantilla, exportarInventario, type FilaImport } 
 
 type Modo = 'ambos' | 'crear' | 'actualizar'
 type Detalle = {
-  fila: number; sku: string | null; nombre?: string | null; sku_generado?: boolean; producto_nuevo?: boolean; accion: 'crear' | 'actualizar' | 'sin_cambios' | 'error'; errores?: string[]
+  fila: number; sku: string | null; nombre?: string | null; sku_generado?: boolean; producto_nuevo?: boolean; set_nuevo?: string | null; accion: 'crear' | 'actualizar' | 'sin_cambios' | 'error'; errores?: string[]
   stock_antes?: number | null; stock_nuevo?: number | null; precio_antes?: number | null; precio_nuevo?: number | null
   oferta_antes?: number | null; oferta_nueva?: number | null
 }
@@ -168,7 +168,7 @@ export default function Importar() {
                 {detalle.map((d) => (
                   <tr key={d.fila} className={d.accion === 'error' ? 'fila-error' : ''}>
                     <td>{d.fila}</td>
-                    <td>{d.nombre ?? '—'}{d.producto_nuevo && <div className="chico aviso">Producto nuevo</div>}</td>
+                    <td>{d.nombre ?? '—'}{d.producto_nuevo && <div className="chico aviso">Producto nuevo</div>}{d.set_nuevo && <div className="chico aviso">Crea el set {d.set_nuevo}</div>}</td>
                     <td className="mono">{d.sku ?? '—'}{d.sku_generado && <div className="chico muted">generado</div>}</td>
                     <td><span className={`pill a-${d.accion}`}>{ETIQUETA_ACCION[d.accion]}</span></td>
                     <td>

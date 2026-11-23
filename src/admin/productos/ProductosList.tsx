@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase, mensajeError, urlFoto } from '../../lib/supabase'
 import type { Tables } from '../../lib/database.types'
 import { formatoCLP, ETIQUETA_TIPO } from '../../lib/format'
@@ -15,6 +15,8 @@ type Fila = Tables<'productos'> & {
 }
 
 export default function ProductosList() {
+  const [params, setParams] = useSearchParams()
+  const filtroSet = params.get('set') ?? ''
   const [juegos, setJuegos] = useState<Tables<'juegos'>[]>([])
   const [filas, setFilas] = useState<Fila[]>([])
   const [total, setTotal] = useState(0)
@@ -37,7 +39,7 @@ export default function ProductosList() {
     supabase.from('juegos').select('*').order('orden').then(({ data }) => setJuegos(data ?? []))
   }, [])
 
-  useEffect(() => { setPagina(0) }, [busqueda, juego, tipo, soloSinStock])
+  useEffect(() => { setPagina(0) }, [busqueda, juego, tipo, soloSinStock, filtroSet])
 
   useEffect(() => {
     let activo = true
@@ -63,6 +65,7 @@ export default function ProductosList() {
         .range(pagina * POR_PAGINA, pagina * POR_PAGINA + POR_PAGINA - 1)
 
       if (juego) consulta = consulta.eq('juego_id', juego)
+      if (filtroSet) consulta = consulta.eq('set_id', filtroSet)
       if (tipo) consulta = consulta.eq('tipo', tipo as Tables<'productos'>['tipo'])
       if (q) {
         const nombre = `nombre.ilike.%${q.replace(/[,()]/g, ' ')}%`
@@ -77,7 +80,7 @@ export default function ProductosList() {
       setTotal(count ?? 0)
     }, 250)
     return () => { activo = false; clearTimeout(t) }
-  }, [busqueda, juego, tipo, pagina])
+  }, [busqueda, juego, tipo, pagina, filtroSet])
 
   const visibles = useMemo(
     () => (soloSinStock ? filas.filter((f) => f.producto_variantes.some((v) => v.visible && v.stock === 0)) : filas),
@@ -110,6 +113,12 @@ export default function ProductosList() {
         <label className="check"><input type="checkbox" checked={soloSinStock} onChange={(e) => setSoloSinStock(e.target.checked)} /> Con variantes agotadas</label>
       </section>
 
+      {filtroSet && (
+        <p className="fila-botones">
+          <span className="pill a-crear">Set: {filas[0]?.sets ? `${filas[0].sets.nombre}${filas[0].sets.codigo ? ` (${filas[0].sets.codigo})` : ''}` : 'filtrado'}</span>
+          <button className="btn-link" onClick={() => setParams({})}>Quitar filtro</button>
+        </p>
+      )}
       {error && <p className="error">{error}</p>}
 
       <section className="card sin-padding tabla-scroll">

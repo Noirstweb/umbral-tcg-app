@@ -8,6 +8,7 @@ export type FilaImport = Record<string, string>
 export const COLUMNAS = [
   { clave: 'nombre', titulo: 'nombre', ayuda: 'Nombre del producto o carta. Con esto (más set y número) el panel encuentra el producto, no necesitas SKU' },
   { clave: 'set_codigo', titulo: 'set_codigo', ayuda: 'Código del set (ver hoja Listas). Ayuda a distinguir cartas con el mismo nombre' },
+  { clave: 'set_nombre', titulo: 'set_nombre', ayuda: 'Solo si el set es NUEVO: escribe su nombre (y el juego) y se crea automáticamente' },
   { clave: 'numero_carta', titulo: 'numero_carta', ayuda: 'Singles: número de la carta. Ej: 001/198 (también sirve 1 o 001)' },
   { clave: 'idioma', titulo: 'idioma', ayuda: 'Español, Inglés, Japonés, Coreano, Chino… (vacío = Español)' },
   { clave: 'estado', titulo: 'estado', ayuda: 'Solo singles y obligatorio: NM, LP, MP, HP o DMG' },
@@ -140,6 +141,7 @@ const INSTRUCCIONES = [
   '3. Para AGREGAR una versión nueva de una carta que ya está en la tienda: nombre, idioma, estado, precio y stock.',
   '4. Para un PRODUCTO NUEVO: nombre, set_codigo (o juego), precio y stock. En singles agrega numero_carta y estado.',
   '   El tipo se deduce (si tiene estado es single); escríbelo si es sellado, accesorio o preventa.',
+  '   ¿Salió un set nuevo? Escribe su código en set_codigo, su nombre en set_nombre y el juego: se crea solo. También puedes crearlo en "Juegos y sets".',
   '5. Para ACTUALIZAR basta con identificar la carta y escribir lo que cambia. Las celdas vacías conservan el valor actual.',
   '6. El stock es el TOTAL disponible, no lo que se suma. Si tienes 5 y escribes 8, quedan 8.',
   '7. Para quitar una oferta escribe 0 en precio_oferta.',
@@ -211,7 +213,7 @@ export async function exportarInventario() {
     nombre: v.productos?.nombre ?? '', set_codigo: v.productos?.sets?.codigo ?? '', numero_carta: v.productos?.numero_carta ?? '',
     idioma: v.idioma, estado: v.estado_carta ?? '', acabado: v.acabado, precio: v.precio, precio_oferta: v.precio_oferta ?? '',
     stock: v.stock, stock_minimo: v.stock_minimo, visible: v.visible ? 'si' : 'no', tipo: v.productos?.tipo ?? '',
-    juego: v.productos?.juego_id ?? '', rareza: v.productos?.rareza ?? '', sku: v.sku, producto_slug: v.productos?.slug ?? '',
+    set_nombre: '', juego: v.productos?.juego_id ?? '', rareza: v.productos?.rareza ?? '', sku: v.sku, producto_slug: v.productos?.slug ?? '',
   })))
   hojaInstrucciones(libro)
   const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' })

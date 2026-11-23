@@ -27,7 +27,7 @@ const IDIOMA_CORTO: Record<string, string> = {
  * Si ese código ya existe, la base le agrega -2, -3… al guardar.
  * Ej: single PKD1 001/198 Inglés LP foil → PKD1-001-EN-LP-F · sellado "Sobre Expansión Demo II" → PKD2-SOB-EXP-DEM-ES
  */
-export function skuAutomatico(d: { tipo: string; nombre: string; numero: string; juego: string; set: string; idioma: string; estado: string; acabado: string }) {
+export function skuAutomatico(d: { tipo: string; nombre: string; numero: string; juego: string; juegoNombre?: string; set: string; idioma: string; estado: string; acabado: string }) {
   const partes: string[] = []
   if (d.tipo === 'preventa') partes.push('PRE')
   if (d.tipo === 'accesorio' && !d.set) partes.push('ACC')
@@ -36,8 +36,10 @@ export function skuAutomatico(d: { tipo: string; nombre: string; numero: string;
   if (d.tipo === 'single' && d.numero.trim()) {
     partes.push(d.numero.split('/')[0].replace(/^.*-/, '').toUpperCase().replace(/[^A-Z0-9]/g, ''))
   } else {
+    // no repetir el nombre del juego ("Pokémon …" ya va con prefijo POK)
+    const omitir = new Set([...sinTildes(d.juegoNombre ?? '').toUpperCase().split(/[^A-Z0-9]+/), d.juego.toUpperCase()])
     sinTildes(d.nombre).toUpperCase().split(/[^A-Z0-9]+/)
-      .filter((w) => w && !PALABRAS_VACIAS.has(w)).slice(0, 3)
+      .filter((w) => w && !PALABRAS_VACIAS.has(w) && !omitir.has(w)).slice(0, 3)
       .forEach((w) => partes.push(/^\d+$/.test(w) ? w : w.slice(0, 3)))
   }
   partes.push(d.idioma in IDIOMA_CORTO ? IDIOMA_CORTO[d.idioma] : sinTildes(d.idioma).slice(0, 2))

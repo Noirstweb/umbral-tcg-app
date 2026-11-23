@@ -112,7 +112,7 @@ export default function ProductoForm() {
   }
 
   function skuSugerido(v: VarEdit) {
-    return skuAutomatico({ tipo, nombre, numero, juego: juegoId, set: setCodigo, idioma: v.idioma, estado: esSingle ? v.estado_carta : '', acabado: v.acabado })
+    return skuAutomatico({ tipo, nombre, numero, juego: juegoId, juegoNombre: juegos.find((j) => j.id === juegoId)?.nombre, set: setCodigo, idioma: v.idioma, estado: esSingle ? v.estado_carta : '', acabado: v.acabado })
   }
 
   function quitarVar(v: VarEdit) {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { avisarCambioPedidos } from '../../lib/eventos'
 import { supabase, mensajeError } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
 import { formatoCLP, formatoFecha, ACABADOS } from '../../lib/format'
@@ -14,14 +15,20 @@ type Item = Tables<'pedido_items'>
 type Pago = Tables<'pagos'>
 type Evento = Tables<'pedido_eventos'>
 
-export default function PedidoDetalle() {
+/** La clave reinicia formularios y mensajes al pasar de un pedido a otro */
+export default function PedidoDetalleRuta() {
   const { id } = useParams()
+  return <PedidoDetalle key={id} id={id} />
+}
+
+function PedidoDetalle({ id }: { id: string | undefined }) {
   const { esDueno, session } = useAuth()
   const [p, setP] = useState<Pedido | null>(null)
   const [items, setItems] = useState<Item[]>([])
   const [pagos, setPagos] = useState<Pago[]>([])
   const [eventos, setEventos] = useState<Evento[]>([])
   const [nombresStaff, setNombresStaff] = useState<Record<string, string>>({})
+  const [tienda, setTienda] = useState('la tienda')
   const [cargando, setCargando] = useState(true)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -41,12 +48,13 @@ export default function PedidoDetalle() {
 
   const cargar = useCallback(async () => {
     if (!id) return
-    const [rp, ri, rg, re, rs] = await Promise.all([
+    const [rp, ri, rg, re, rs, rc] = await Promise.all([
       supabase.from('pedidos').select('*').eq('id', id).maybeSingle(),
       supabase.from('pedido_items').select('*').eq('pedido_id', id),
       supabase.from('pagos').select('*').eq('pedido_id', id).order('created_at'),
       supabase.from('pedido_eventos').select('*').eq('pedido_id', id).order('created_at'),
       supabase.from('staff').select('user_id, nombre'),
+      supabase.from('configuracion').select('nombre_tienda').eq('id', 1).maybeSingle(),
     ])
     setCargando(false)
     const err = rp.error ?? ri.error ?? rg.error ?? re.error
@@ -54,6 +62,7 @@ export default function PedidoDetalle() {
     if (!rp.data) return setError('No encontré ese pedido.')
     setP(rp.data); setItems(ri.data ?? []); setPagos(rg.data ?? []); setEventos(re.data ?? [])
     setNombresStaff(Object.fromEntries((rs.data ?? []).map((s) => [s.user_id, s.nombre])))
+    if (rc.data?.nombre_tienda) setTienda(rc.data.nombre_tienda)
     setNotaInterna(rp.data.nota_interna ?? ''); setDocNumero(rp.data.documento_numero ?? '')
   }, [id])
   useEffect(() => { cargar() }, [cargar])
@@ -66,6 +75,7 @@ export default function PedidoDetalle() {
     if (error) return setError(mensajeError(error))
     if (!data?.length) return setError('No tienes permiso para modificar este pedido.')
     setOk(mensaje); setCancelando(false)
+    avisarCambioPedidos()
     await cargar()
   }
 
@@ -97,7 +107,8 @@ export default function PedidoDetalle() {
     const { error } = await supabase.rpc('confirmar_transferencia', { p_pedido: p.id, p_monto: monto, p_referencia: transf.ref })
     setOcupado(false)
     if (error) return setError(mensajeError(error))
-    setTransf(null); setOk('Transferencia confirmada. El pedido quedó pagado y listo para preparar.')
+    setTransf(null); setOk(p.estado === 'cancelado' ? 'Transferencia confirmada. El pedido se reactivó, el stock se volvió a reservar y quedó listo para preparar.' : 'Transferencia confirmada. El pedido quedó pagado y listo para preparar.')
+    avisarCambioPedidos()
     await cargar()
   }
 
@@ -139,8 +150,25 @@ export default function PedidoDetalle() {
   const est = ESTADO_PEDIDO[p.estado]
   const esRetiro = p.metodo_entrega === 'retiro'
   const unidades = items.reduce((s, i) => s + i.cantidad, 0)
-  const wa = linkWhatsApp(p.contacto_telefono, `Hola ${p.contacto_nombre.split(' ')[0]}, te escribimos de Umbral TCG por tu pedido #${p.numero}.`)
+  const wa = linkWhatsApp(p.contacto_telefono, `Hola ${p.contacto_nombre.split(' ')[0]}, te escribimos de ${tienda} por tu pedido #${p.numero}.`)
   const esPrueba = (p.nota_interna ?? '').startsWith('[PRUEBA]')
+  const huboCobro = pagos.some((g) => ['aprobado', 'requiere_reembolso', 'reembolsado'].includes(g.estado))
+  const formTransferencia = transf && (
+    <form className="grilla" onSubmit={confirmarTransferencia}>
+      <label>Monto recibido
+        <input inputMode="numeric" value={transf.monto} onChange={(e) => setTransf({ ...transf, monto: e.target.value })} />
+        <span className="ayuda">Debe ser exactamente {formatoCLP(p.total)}</span>
+      </label>
+      <label className="ancho-2">N° de operación o referencia
+        <input value={transf.ref} onChange={(e) => setTransf({ ...transf, ref: e.target.value })} placeholder="Ej: 004512398 (aparece en tu cartola)" autoFocus />
+        {p.estado === 'cancelado' && <span className="ayuda">Se vuelve a reservar el stock. Si ya no queda, te avisará para que devuelvas la transferencia.</span>}
+      </label>
+      <div className="fila-botones">
+        <button className="btn primario" disabled={ocupado}>{p.estado === 'cancelado' ? 'Confirmar y reactivar' : 'Confirmar pago'}</button>
+        <button type="button" className="btn" onClick={() => setTransf(null)}>Volver</button>
+      </div>
+    </form>
+  )
 
   return (
     <>
@@ -167,23 +195,9 @@ export default function PedidoDetalle() {
 
         {p.estado === 'pendiente_pago' && (
           <>
-            {p.expira_en && <p>Se cancela solo si no paga antes del <strong>{formatoFecha(p.expira_en)}</strong>.</p>}
+            {p.expira_en && <p>Se cancela solo si no paga antes del <strong>{formatoFecha(p.expira_en)}</strong></p>}
             {esDueno && !transf && <button className="btn primario" onClick={() => setTransf({ monto: String(p.total), ref: '' })}>Confirmar transferencia recibida</button>}
-            {esDueno && transf && (
-              <form className="grilla" onSubmit={confirmarTransferencia}>
-                <label>Monto recibido
-                  <input inputMode="numeric" value={transf.monto} onChange={(e) => setTransf({ ...transf, monto: e.target.value })} />
-                  <span className="ayuda">Debe ser exactamente {formatoCLP(p.total)}</span>
-                </label>
-                <label className="ancho-2">N° de operación o referencia
-                  <input value={transf.ref} onChange={(e) => setTransf({ ...transf, ref: e.target.value })} placeholder="Ej: 004512398 (aparece en tu cartola)" autoFocus />
-                </label>
-                <div className="fila-botones">
-                  <button className="btn primario" disabled={ocupado}>Confirmar pago</button>
-                  <button type="button" className="btn" onClick={() => setTransf(null)}>Volver</button>
-                </div>
-              </form>
-            )}
+            {esDueno && transf && formTransferencia}
             {!esDueno && <p className="muted chico">Solo el dueño puede confirmar transferencias.</p>}
           </>
         )}
@@ -218,11 +232,20 @@ export default function PedidoDetalle() {
           </button>
         )}
 
-        {p.estado === 'entregado' && <p>Entregado el {formatoFecha(p.entregado_en)}.</p>}
-        {p.estado === 'cancelado' && <p>Cancelado el {formatoFecha(p.cancelado_en)}. Motivo: <strong>{p.motivo_cancelacion}</strong></p>}
+        {p.estado === 'entregado' && <p>Entregado el {formatoFecha(p.entregado_en)}</p>}
+        {p.estado === 'cancelado' && <p>Cancelado el {formatoFecha(p.cancelado_en)} · Motivo: <strong>{p.motivo_cancelacion}</strong></p>}
+        {p.estado === 'cancelado' && esDueno && !huboCobro && !transf && (
+          <p className="chico">¿Te llegó una transferencia de este pedido después de cancelado?{' '}
+            <button className="btn-link" onClick={() => setTransf({ monto: String(p.total), ref: '' })}>Confirmarla y reactivar el pedido</button>
+          </p>
+        )}
+        {p.estado === 'cancelado' && esDueno && transf && formTransferencia}
 
-        {puedeCancelar(p.estado) && !cancelando && (
+        {puedeCancelar(p.estado) && !cancelando && (esDueno || p.estado === 'pendiente_pago') && (
           <p className="separado"><button className="btn-link peligro" onClick={() => setCancelando(true)}>Cancelar este pedido…</button></p>
+        )}
+        {puedeCancelar(p.estado) && !esDueno && p.estado !== 'pendiente_pago' && (
+          <p className="separado chico muted">Si hay que cancelar este pedido, avísale al dueño: ya está pagado y hay que devolver el dinero.</p>
         )}
         {cancelando && (
           <form className="cancelar" onSubmit={cancelar}>

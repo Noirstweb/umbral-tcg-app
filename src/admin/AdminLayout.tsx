@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { alCambiarPedidos } from '../lib/eventos'
 import { useAuth } from '../auth/AuthProvider'
 
 export default function AdminLayout() {
@@ -10,8 +11,12 @@ export default function AdminLayout() {
 
   // Pedidos pagados que esperan preparación o entrega (se refresca al navegar)
   useEffect(() => {
-    supabase.from('pedidos').select('id', { count: 'exact', head: true }).in('estado', ['pagado', 'preparando', 'listo_para_retiro'])
-      .then(({ count }) => setPorAtender(count ?? 0))
+    const contar = () => {
+      supabase.from('pedidos').select('id', { count: 'exact', head: true }).in('estado', ['pagado', 'preparando', 'listo_para_retiro'])
+        .then(({ count }) => setPorAtender(count ?? 0))
+    }
+    contar()
+    return alCambiarPedidos(contar)
   }, [pathname])
 
   return (

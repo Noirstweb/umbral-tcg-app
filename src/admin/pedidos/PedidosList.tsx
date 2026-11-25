@@ -47,9 +47,10 @@ export default function PedidosList() {
         .select('id, numero, created_at, estado, contacto_nombre, contacto_email, metodo_entrega, envio_comuna, total, tipo_documento, expira_en, pedido_items(cantidad), pagos(estado)', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(pagina * POR_PAGINA, pagina * POR_PAGINA + POR_PAGINA - 1)
+      // Al buscar se revisan todos los pedidos, no solo la pestaña abierta
+      const b = busqueda.trim().replace(/[,()%*\\]/g, ' ').trim()
       const estados = FILTROS.find((f) => f.clave === filtro)?.estados
-      if (estados) q = q.in('estado', estados)
-      const b = busqueda.trim().replace(/[,()]/g, ' ')
+      if (estados && !b) q = q.in('estado', estados)
       if (b) {
         const num = b.replace(/^#/, '')
         q = /^\d+$/.test(num)
@@ -79,7 +80,7 @@ export default function PedidosList() {
 
       <nav className="pestanas" aria-label="Estado de los pedidos">
         {FILTROS.map((f) => (
-          <button key={f.clave} className={`pestana ${filtro === f.clave ? 'activa' : ''}`} onClick={() => setParams(f.clave === 'atender' ? {} : { f: f.clave })}>
+          <button key={f.clave} className={`pestana ${filtro === f.clave && !busqueda.trim() ? 'activa' : ''}`} onClick={() => { setBusqueda(''); setParams(f.clave === 'atender' ? {} : { f: f.clave }) }}>
             {f.texto}{f.estados && conteos[f.clave] != null && <span className={`contador ${f.clave === 'atender' && conteos[f.clave] > 0 ? 'fuerte' : ''}`}>{conteos[f.clave]}</span>}
           </button>
         ))}
@@ -87,6 +88,7 @@ export default function PedidosList() {
 
       <section className="card filtros filtros-pedidos">
         <input type="search" placeholder="Buscar por número (#1034), nombre, correo o comuna…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar pedidos" />
+        {busqueda.trim() && <span className="chico muted">Buscando en todos los pedidos, sin importar la pestaña.</span>}
       </section>
 
       {error && <p className="error">{error}</p>}
@@ -123,7 +125,7 @@ export default function PedidosList() {
 
       <nav className="paginacion" aria-label="Paginación">
         <button className="btn" disabled={pagina === 0} onClick={() => setPagina((p) => p - 1)}>Anterior</button>
-        <span className="muted">Página {pagina + 1} de {paginas} · {total} pedidos</span>
+        <span className="muted">Página {pagina + 1} de {paginas} · {total} {total === 1 ? 'pedido' : 'pedidos'}</span>
         <button className="btn" disabled={pagina + 1 >= paginas} onClick={() => setPagina((p) => p + 1)}>Siguiente</button>
       </nav>
     </>

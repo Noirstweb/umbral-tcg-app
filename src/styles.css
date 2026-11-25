@@ -206,3 +206,7 @@ address { font-style: normal; line-height: 1.6; }
 textarea { width: 100%; resize: vertical; }
 
 @media (max-width: 900px) { .detalle-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.kpi-link { color: inherit; text-decoration: none; }
+.kpi-link:hover { border-color: var(--marca); text-decoration: none; }
+.kpi-destacado { border-color: var(--marca); background: var(--marca-suave); }

@@ -12,6 +12,8 @@ const ProductosList = lazy(() => import('./admin/productos/ProductosList'))
 const ProductoForm = lazy(() => import('./admin/productos/ProductoForm'))
 const Importar = lazy(() => import('./admin/importar/Importar'))
 const JuegosSets = lazy(() => import('./admin/catalogo/JuegosSets'))
+const PedidosList = lazy(() => import('./admin/pedidos/PedidosList'))
+const PedidoDetalle = lazy(() => import('./admin/pedidos/PedidoDetalle'))
 
 function Portada() {
   return (
@@ -42,6 +44,8 @@ export default function App() {
               <Route path="productos/:id" element={<ProductoForm />} />
               <Route path="importar" element={<Importar />} />
               <Route path="sets" element={<JuegosSets />} />
+              <Route path="pedidos" element={<PedidosList />} />
+              <Route path="pedidos/:id" element={<PedidoDetalle />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

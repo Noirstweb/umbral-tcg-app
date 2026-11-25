@@ -41,6 +41,9 @@ export function mensajeError(e: unknown): string {
     if (msg.includes('sku')) return 'El SKU solo puede tener mayúsculas, números, guiones y guion bajo.'
     if (msg.includes('slug')) return 'El slug solo puede tener minúsculas, números y guiones.'
     if (msg.includes('stock')) return 'El stock no puede ser negativo.'
+    if (msg.includes('enviado_valido')) return 'Para marcar como enviado hace falta el transportista y el número de seguimiento.'
+    if (msg.includes('cancelado_valido')) return 'Para cancelar hace falta escribir el motivo.'
+    if (msg.includes('listo_retiro_valido')) return 'Solo los pedidos con retiro en tienda pueden quedar «listo para retiro».'
   }
   if (msg === 'Invalid login credentials') return 'Correo o contraseña incorrectos.'
   return msg

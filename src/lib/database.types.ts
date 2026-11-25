@@ -388,6 +388,80 @@ export type Database = {
           },
         ]
       }
+      pedidos: {
+        Row: {
+          cancelado_en: string | null; cliente_id: string; contacto_email: string; contacto_nombre: string; contacto_telefono: string
+          costo_envio: number; created_at: string; cupon_codigo: string | null; descuento: number; documento_emitido_en: string | null
+          documento_numero: string | null; entregado_en: string | null; enviado_en: string | null; envio_calle: string | null
+          envio_comuna: string | null; envio_depto: string | null; envio_destinatario: string | null; envio_numero: string | null
+          envio_referencias: string | null; envio_region: string | null; envio_telefono: string | null
+          estado: Database["public"]["Enums"]["estado_pedido"]; expira_en: string | null; factura_direccion: string | null
+          factura_giro: string | null; factura_razon_social: string | null; factura_rut: string | null; id: string
+          listo_retiro_en: string | null; metodo_entrega: Database["public"]["Enums"]["metodo_entrega"]; motivo_cancelacion: string | null
+          mp_preference_id: string | null; nota_cliente: string | null; nota_interna: string | null; numero: number
+          numero_seguimiento: string | null; pagado_en: string | null; retiro_nombre: string | null; subtotal: number
+          tipo_documento: Database["public"]["Enums"]["tipo_documento"]; token_publico: string; total: number
+          transportista: string | null; updated_at: string; zona_id: string | null
+        }
+        Insert: { cliente_id: string; contacto_email: string; contacto_nombre: string; contacto_telefono: string; metodo_entrega: Database["public"]["Enums"]["metodo_entrega"]; subtotal: number; [k: string]: unknown }
+        Update: {
+          estado?: Database["public"]["Enums"]["estado_pedido"]; transportista?: string | null; numero_seguimiento?: string | null
+          motivo_cancelacion?: string | null; nota_interna?: string | null; documento_numero?: string | null; documento_emitido_en?: string | null
+        }
+        Relationships: [
+          { foreignKeyName: "pedidos_cliente_id_fkey"; columns: ["cliente_id"]; isOneToOne: false; referencedRelation: "clientes"; referencedColumns: ["id"] },
+        ]
+      }
+      pedido_items: {
+        Row: {
+          acabado: string | null; cantidad: number; es_preventa: boolean; estado_carta: Database["public"]["Enums"]["estado_carta"] | null
+          fecha_lanzamiento: string | null; id: string; idioma: string | null; juego: string; nombre: string; numero_carta: string | null
+          pedido_id: string; precio_unitario: number; set_nombre: string | null; sku: string; subtotal: number | null
+          tipo: Database["public"]["Enums"]["tipo_producto"]; variante_id: string | null
+        }
+        Insert: { pedido_id: string; variante_id: string; cantidad: number }
+        Update: { [_ in never]: never }
+        Relationships: [
+          { foreignKeyName: "pedido_items_pedido_id_fkey"; columns: ["pedido_id"]; isOneToOne: false; referencedRelation: "pedidos"; referencedColumns: ["id"] },
+        ]
+      }
+      pagos: {
+        Row: {
+          created_at: string; estado: Database["public"]["Enums"]["estado_pago"]; id: string; monto: number; pedido_id: string
+          proveedor: Database["public"]["Enums"]["proveedor_pago"]; proveedor_pago_id: string; reembolsado_en: string | null
+          respuesta: Json; updated_at: string
+        }
+        Insert: { [_ in never]: never }
+        Update: { estado?: Database["public"]["Enums"]["estado_pago"]; reembolsado_en?: string | null }
+        Relationships: [
+          { foreignKeyName: "pagos_pedido_id_fkey"; columns: ["pedido_id"]; isOneToOne: false; referencedRelation: "pedidos"; referencedColumns: ["id"] },
+        ]
+      }
+      pedido_eventos: {
+        Row: {
+          autor_id: string | null; created_at: string; estado_anterior: Database["public"]["Enums"]["estado_pedido"] | null
+          estado_nuevo: Database["public"]["Enums"]["estado_pedido"]; id: string; nota: string | null; pedido_id: string; visible_cliente: boolean
+        }
+        Insert: {
+          autor_id?: string | null; estado_anterior?: Database["public"]["Enums"]["estado_pedido"] | null
+          estado_nuevo: Database["public"]["Enums"]["estado_pedido"]; nota?: string | null; pedido_id: string; visible_cliente?: boolean
+        }
+        Update: { [_ in never]: never }
+        Relationships: [
+          { foreignKeyName: "pedido_eventos_pedido_id_fkey"; columns: ["pedido_id"]; isOneToOne: false; referencedRelation: "pedidos"; referencedColumns: ["id"] },
+        ]
+      }
+      notificaciones: {
+        Row: {
+          canal: string; created_at: string; destinatario: string; enviada_en: string | null; estado: string; id: string
+          intentos: number; pedido_id: string; tipo: string; ultimo_error: string | null
+        }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: [
+          { foreignKeyName: "notificaciones_pedido_id_fkey"; columns: ["pedido_id"]; isOneToOne: false; referencedRelation: "pedidos"; referencedColumns: ["id"] },
+        ]
+      }
       staff: {
         Row: { activo: boolean; created_at: string; nombre: string; rol: Database["public"]["Enums"]["rol_staff"]; user_id: string }
         Insert: { activo?: boolean; created_at?: string; nombre: string; rol?: Database["public"]["Enums"]["rol_staff"]; user_id: string }
@@ -410,9 +484,18 @@ export type Database = {
         Args: { p_archivo: string; p_modo: string; p_filas: Json; p_simular?: boolean }
         Returns: Json
       }
+      confirmar_transferencia: {
+        Args: { p_monto: number; p_pedido: string; p_referencia: string }
+        Returns: string
+      }
     }
     Enums: {
       estado_carta: "NM" | "LP" | "MP" | "HP" | "DMG"
+      estado_pago: "pendiente" | "aprobado" | "rechazado" | "reembolsado" | "requiere_reembolso" | "requiere_revision"
+      estado_pedido: "pendiente_pago" | "pagado" | "preparando" | "listo_para_retiro" | "enviado" | "entregado" | "cancelado"
+      metodo_entrega: "retiro" | "envio_santiago" | "envio_regiones"
+      proveedor_pago: "mercadopago" | "webpay" | "transferencia"
+      tipo_documento: "boleta" | "factura"
       motivo_stock: "reserva" | "liberacion" | "cancelacion" | "reactivacion" | "carga_excel" | "ajuste_manual"
       rol_staff: "dueno" | "vendedor"
       tipo_producto: "sellado" | "single" | "accesorio" | "preventa"
